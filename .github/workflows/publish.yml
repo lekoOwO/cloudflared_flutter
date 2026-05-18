@@ -58,6 +58,8 @@ jobs:
           cache-dependency-path: mobile/go.sum
 
       - name: Install gomobile
+        env:
+          GOTOOLCHAIN: auto
         run: |
           go install golang.org/x/mobile/cmd/gomobile@latest
           go install golang.org/x/mobile/cmd/gobind@latest
@@ -84,6 +86,8 @@ jobs:
           Set-Content $full $content -NoNewline
 
       - name: Build Android libraries
+        env:
+          GOTOOLCHAIN: auto
         run: |
           cd mobile
           ./build.sh android
