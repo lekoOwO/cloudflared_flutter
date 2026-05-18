@@ -68,7 +68,7 @@ jobs:
       - name: Build Android example
         run: |
           cd packages/cloudflared_tunnel_full/example
-          flutter build apk --debug
+          flutter build apk --debug --target-platform android-arm,android-arm64,android-x64
 
       - name: Restore publish pubspecs
         shell: pwsh
