@@ -61,7 +61,9 @@ jobs:
           flutter analyze packages/cloudflared_tunnel_full/example
 
       - name: Test
-        run: flutter test packages/cloudflared_tunnel_full
+        run: |
+          cd packages/cloudflared_tunnel_full
+          flutter test
 
       - name: Build Android example
         run: |

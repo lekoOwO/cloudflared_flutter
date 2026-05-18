@@ -102,7 +102,9 @@ jobs:
           flutter analyze packages/cloudflared_tunnel_android_arm
           flutter analyze packages/cloudflared_tunnel_android_x86
           flutter analyze packages/cloudflared_tunnel_full
-          flutter test packages/cloudflared_tunnel_full
+          cd packages/cloudflared_tunnel_full
+          flutter test
+          cd ../..
           ./tool/restore_pubspecs.ps1
 
 
