@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           submodules: recursive
 
@@ -23,7 +23,7 @@ jobs:
           cache: true
 
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version-file: mobile/go.mod
           cache-dependency-path: mobile/go.sum
@@ -95,7 +95,7 @@ jobs:
           echo "Its pub publish dry-run is performed in publish.yml after sidecar versions are visible on pub.dev."
 
       - name: Upload Android package artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: split-packages
           path: ${{ runner.temp }}/pub-packages
