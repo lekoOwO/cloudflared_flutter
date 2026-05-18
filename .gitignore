@@ -2,6 +2,7 @@
 mobile/build/
 *.aar
 *.xcframework
+.worktrees/
 
 # Go (exclude from root, but allow in jniLibs for publishing)
 *.exe
