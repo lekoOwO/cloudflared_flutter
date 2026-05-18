@@ -74,17 +74,20 @@ jobs:
         shell: pwsh
         run: ./tool/restore_pubspecs.ps1
 
+      - name: Stage publish packages
+        run: bash tool/stage_publish_packages.sh "$RUNNER_TEMP/pub-packages"
+
       - name: Check package sizes
         run: |
           bash tool/check_package_sizes.sh \
-            packages/cloudflared_tunnel_android_arm \
-            packages/cloudflared_tunnel_android_x86 \
-            packages/cloudflared_tunnel_full
+            "$RUNNER_TEMP/pub-packages/cloudflared_tunnel_android_arm" \
+            "$RUNNER_TEMP/pub-packages/cloudflared_tunnel_android_x86" \
+            "$RUNNER_TEMP/pub-packages/cloudflared_tunnel_full"
 
       - name: Publish dry-run sidecar packages
         run: |
-          dart pub publish --dry-run --directory packages/cloudflared_tunnel_android_arm
-          dart pub publish --dry-run --directory packages/cloudflared_tunnel_android_x86
+          dart pub publish --dry-run --directory "$RUNNER_TEMP/pub-packages/cloudflared_tunnel_android_arm"
+          dart pub publish --dry-run --directory "$RUNNER_TEMP/pub-packages/cloudflared_tunnel_android_x86"
 
       - name: Explain full package dry-run timing
         run: |
@@ -95,7 +98,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: split-packages
-          path: |
-            packages/cloudflared_tunnel_android_arm
-            packages/cloudflared_tunnel_android_x86
-            packages/cloudflared_tunnel_full
+          path: ${{ runner.temp }}/pub-packages
