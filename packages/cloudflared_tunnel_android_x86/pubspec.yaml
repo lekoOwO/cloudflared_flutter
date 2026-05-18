@@ -23,3 +23,6 @@ flutter:
       android:
         package: com.cloudflare.cloudflared_tunnel_android_x86
         pluginClass: CloudflaredTunnelAndroidX86Plugin
+false_secrets:
+  - /android/src/main/jniLibs/x86_64/libgojni.so
+  - /android/src/main/jniLibs/x86/libgojni.so
