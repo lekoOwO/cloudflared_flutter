@@ -45,6 +45,29 @@ jobs:
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
+      - name: Check published versions
+        id: published
+        shell: bash
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          missing=0
+          for package in \
+            cloudflared_tunnel_android_arm \
+            cloudflared_tunnel_android_x86 \
+            cloudflared_tunnel_full; do
+            if curl -fsSL "https://pub.dev/api/packages/$package" | grep -q "\"version\":\"$version\""; then
+              echo "$package $version is already published"
+            else
+              echo "$package $version is not published yet"
+              missing=1
+            fi
+          done
+          if [[ "$missing" == "0" ]]; then
+            echo "all=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "all=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -153,16 +176,20 @@ jobs:
           echo "Manual dry run complete."
           echo "Full package publish dry-run requires sidecar package versions to be visible on pub.dev."
 
+      - name: Stop if version is already published
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.dry_run) && steps.published.outputs.all == 'true' }}
+        run: echo "Version ${{ steps.version.outputs.version }} is already published for all packages."
+
       - name: Publish Android ARM package
-        if: ${{ github.event_name != 'workflow_dispatch' || !inputs.dry_run }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.dry_run) && steps.published.outputs.all != 'true' }}
         run: dart pub publish --force --directory "$RUNNER_TEMP/pub-packages/cloudflared_tunnel_android_arm"
 
       - name: Publish Android x86 package
-        if: ${{ github.event_name != 'workflow_dispatch' || !inputs.dry_run }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.dry_run) && steps.published.outputs.all != 'true' }}
         run: dart pub publish --force --directory "$RUNNER_TEMP/pub-packages/cloudflared_tunnel_android_x86"
 
       - name: Wait for sidecar packages
-        if: ${{ github.event_name != 'workflow_dispatch' || !inputs.dry_run }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.dry_run) && steps.published.outputs.all != 'true' }}
         shell: bash
         run: |
           version="${{ steps.version.outputs.version }}"
@@ -182,9 +209,9 @@ jobs:
           done
 
       - name: Publish dry-run full package
-        if: ${{ github.event_name != 'workflow_dispatch' || !inputs.dry_run }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.dry_run) && steps.published.outputs.all != 'true' }}
         run: dart pub publish --dry-run --directory "$RUNNER_TEMP/pub-packages/cloudflared_tunnel_full"
 
       - name: Publish full package
-        if: ${{ github.event_name != 'workflow_dispatch' || !inputs.dry_run }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.dry_run) && steps.published.outputs.all != 'true' }}
         run: dart pub publish --force --directory "$RUNNER_TEMP/pub-packages/cloudflared_tunnel_full"
