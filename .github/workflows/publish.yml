@@ -1,0 +1,182 @@
+name: Publish
+
+on:
+  push:
+    tags:
+      - "cloudflared_tunnel-v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to publish, for example 1.0.0"
+        required: true
+        type: string
+      dry_run:
+        description: "Run validation without publishing"
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Resolve version
+        id: version
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            version="${{ inputs.version }}"
+          else
+            tag="${GITHUB_REF_NAME}"
+            version="${tag#cloudflared_tunnel-v}"
+          fi
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Invalid version: $version" >&2
+            exit 64
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: mobile/go.mod
+          cache-dependency-path: mobile/go.sum
+
+      - name: Install gomobile
+        run: |
+          go install golang.org/x/mobile/cmd/gomobile@latest
+          go install golang.org/x/mobile/cmd/gobind@latest
+          gomobile init
+
+      - name: Stamp package versions
+        shell: pwsh
+        run: |
+          $version = '${{ steps.version.outputs.version }}'
+          $pubspecs = @(
+            'packages/cloudflared_tunnel_android_arm/pubspec.yaml',
+            'packages/cloudflared_tunnel_android_x86/pubspec.yaml',
+            'packages/cloudflared_tunnel_full/pubspec.yaml'
+          )
+          foreach ($file in $pubspecs) {
+            $content = Get-Content $file -Raw
+            $content = $content -replace 'version: .+', "version: $version"
+            Set-Content $file $content -NoNewline
+          }
+          $full = 'packages/cloudflared_tunnel_full/pubspec.yaml'
+          $content = Get-Content $full -Raw
+          $content = $content -replace 'cloudflared_tunnel_android_arm: \^.+', "cloudflared_tunnel_android_arm: ^$version"
+          $content = $content -replace 'cloudflared_tunnel_android_x86: \^.+', "cloudflared_tunnel_android_x86: ^$version"
+          Set-Content $full $content -NoNewline
+
+      - name: Build Android libraries
+        run: |
+          cd mobile
+          ./build.sh android
+
+      - name: Verify ABI split
+        run: bash tool/verify_android_abis.sh packages
+
+      - name: Validate packages locally
+        shell: pwsh
+        run: |
+          ./tool/use_local_packages.ps1
+          flutter pub get --directory packages/cloudflared_tunnel_android_arm
+          flutter pub get --directory packages/cloudflared_tunnel_android_x86
+          flutter pub get --directory packages/cloudflared_tunnel_full
+          flutter pub get --directory packages/cloudflared_tunnel_full/example
+          flutter analyze packages/cloudflared_tunnel_android_arm
+          flutter analyze packages/cloudflared_tunnel_android_x86
+          flutter analyze packages/cloudflared_tunnel_full
+          cd packages/cloudflared_tunnel_full
+          flutter test
+          cd ../..
+          ./tool/restore_pubspecs.ps1
+
+
+      - name: Restamp package versions for publishing
+        shell: pwsh
+        run: |
+          $version = '${{ steps.version.outputs.version }}'
+          $pubspecs = @(
+            'packages/cloudflared_tunnel_android_arm/pubspec.yaml',
+            'packages/cloudflared_tunnel_android_x86/pubspec.yaml',
+            'packages/cloudflared_tunnel_full/pubspec.yaml'
+          )
+          foreach ($file in $pubspecs) {
+            $content = Get-Content $file -Raw
+            $content = $content -replace 'version: .+', "version: $version"
+            Set-Content $file $content -NoNewline
+          }
+          $full = 'packages/cloudflared_tunnel_full/pubspec.yaml'
+          $content = Get-Content $full -Raw
+          $content = $content -replace 'cloudflared_tunnel_android_arm: \^.+', "cloudflared_tunnel_android_arm: ^$version"
+          $content = $content -replace 'cloudflared_tunnel_android_x86: \^.+', "cloudflared_tunnel_android_x86: ^$version"
+          Set-Content $full $content -NoNewline
+      - name: Check package sizes
+        run: |
+          bash tool/check_package_sizes.sh \
+            packages/cloudflared_tunnel_android_arm \
+            packages/cloudflared_tunnel_android_x86 \
+            packages/cloudflared_tunnel_full
+
+      - name: Publish dry-run sidecar packages
+        run: |
+          dart pub publish --dry-run --directory packages/cloudflared_tunnel_android_arm
+          dart pub publish --dry-run --directory packages/cloudflared_tunnel_android_x86
+
+      - name: Stop after manual dry run
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+        run: |
+          echo "Manual dry run complete."
+          echo "Full package publish dry-run requires sidecar package versions to be visible on pub.dev."
+
+      - name: Publish Android ARM package
+        if: ${{ github.event_name != 'workflow_dispatch' || !inputs.dry_run }}
+        run: dart pub publish --force --directory packages/cloudflared_tunnel_android_arm
+
+      - name: Publish Android x86 package
+        if: ${{ github.event_name != 'workflow_dispatch' || !inputs.dry_run }}
+        run: dart pub publish --force --directory packages/cloudflared_tunnel_android_x86
+
+      - name: Wait for sidecar packages
+        if: ${{ github.event_name != 'workflow_dispatch' || !inputs.dry_run }}
+        shell: bash
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          for package in cloudflared_tunnel_android_arm cloudflared_tunnel_android_x86; do
+            echo "Waiting for $package $version on pub.dev"
+            for attempt in {1..30}; do
+              if curl -fsSL "https://pub.dev/api/packages/$package" | grep -q "\"version\":\"$version\""; then
+                echo "$package $version is visible"
+                break
+              fi
+              if [[ "$attempt" == "30" ]]; then
+                echo "$package $version did not become visible on pub.dev" >&2
+                exit 75
+              fi
+              sleep 10
+            done
+          done
+
+      - name: Publish dry-run full package
+        if: ${{ github.event_name != 'workflow_dispatch' || !inputs.dry_run }}
+        run: dart pub publish --dry-run --directory packages/cloudflared_tunnel_full
+
+      - name: Publish full package
+        if: ${{ github.event_name != 'workflow_dispatch' || !inputs.dry_run }}
+        run: dart pub publish --force --directory packages/cloudflared_tunnel_full
