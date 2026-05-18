@@ -1,6 +1,7 @@
 name: cloudflared_tunnel
 description: "Flutter plugin for Cloudflare Tunnel (cloudflared). Create secure tunnels to expose local servers to the internet via Cloudflare's global network. Includes optional built-in HTTP file server."
 version: 1.0.1
+publish_to: none
 homepage: https://github.com/agusibrahim/cloudflared_flutter
 repository: https://github.com/agusibrahim/cloudflared_flutter
 issue_tracker: https://github.com/agusibrahim/cloudflared_flutter/issues

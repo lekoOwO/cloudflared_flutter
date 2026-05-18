@@ -30,3 +30,8 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Split Flutter package build artifacts
+packages/**/build/
+packages/**/.dart_tool/
+packages/**/.packages

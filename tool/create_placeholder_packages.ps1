@@ -49,7 +49,7 @@ The full implementation starts at version `1.0.0`.
 library $($pkg.Name);
 "@ | Set-Content (Join-Path $dir "lib/$($pkg.Name).dart") -NoNewline
 
-  Copy-Item 'flutter_plugin/cloudflared_tunnel/LICENSE' (Join-Path $dir 'LICENSE')
+  Copy-Item 'packages/cloudflared_tunnel_full/LICENSE' (Join-Path $dir 'LICENSE')
 }
 
 Write-Host "Created placeholder packages under $root"
