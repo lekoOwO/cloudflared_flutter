@@ -16,9 +16,9 @@ void main() {
 
   testWidgets('getVersion test', (WidgetTester tester) async {
     final CloudflaredTunnel plugin = CloudflaredTunnel();
-    final String? version = await plugin.getVersion();
+    final version = await plugin.getVersion();
     // The version string depends on the host platform running the test, so
     // just assert that some non-empty string is returned.
-    expect(version?.isNotEmpty, true);
+    expect(version.isNotEmpty, true);
   });
 }

@@ -131,18 +131,18 @@ class RequestLog {
   }
 
   Map<String, dynamic> toJson() => {
-    'timestamp': timestamp,
-    'method': method,
-    'path': path,
-    'remoteAddr': remoteAddr,
-    'userAgent': userAgent,
-    'contentType': contentType,
-    'headers': headers,
-    'query': query,
-    'body': body,
-    'statusCode': statusCode,
-    'durationMs': durationMs,
-  };
+        'timestamp': timestamp,
+        'method': method,
+        'path': path,
+        'remoteAddr': remoteAddr,
+        'userAgent': userAgent,
+        'contentType': contentType,
+        'headers': headers,
+        'query': query,
+        'body': body,
+        'statusCode': statusCode,
+        'durationMs': durationMs,
+      };
 }
 
 /// File info model for directory listing

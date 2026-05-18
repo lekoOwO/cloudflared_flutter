@@ -1316,7 +1316,7 @@ class _HomePageState extends State<HomePage>
         leading: Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
-            color: statusColor.withOpacity(0.1),
+            color: statusColor.withAlpha(26),
             borderRadius: BorderRadius.circular(4),
           ),
           child: Text(
@@ -1354,7 +1354,7 @@ class _HomePageState extends State<HomePage>
         leading: Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
-            color: statusColor.withOpacity(0.1),
+            color: statusColor.withAlpha(26),
             borderRadius: BorderRadius.circular(4),
           ),
           child: Text(

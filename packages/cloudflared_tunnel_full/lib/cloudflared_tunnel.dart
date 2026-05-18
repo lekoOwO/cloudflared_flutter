@@ -1,8 +1,8 @@
-/// Flutter plugin for Cloudflare Tunnel (cloudflared) with optional local HTTP server.
-///
-/// - Cloudflared tunnel connection to Cloudflare's global network
-/// - Optional: Local HTTP file server with request logging (Go-based)
-/// - Tunnel can be used standalone with any Dart HTTP server (shelf, etc.)
+// Flutter plugin for Cloudflare Tunnel (cloudflared) with optional local HTTP server.
+//
+// - Cloudflared tunnel connection to Cloudflare's global network
+// - Optional: Local HTTP file server with request logging (Go-based)
+// - Tunnel can be used standalone with any Dart HTTP server (shelf, etc.)
 
 import 'dart:async';
 import 'cloudflared_tunnel_platform_interface.dart';
@@ -114,41 +114,37 @@ class CloudflaredTunnel {
   }
 
   void _setupEventListening() {
-    _tunnelEventSubscription = CloudflaredTunnelPlatform
-        .instance
-        .tunnelEventStream
-        .listen((event) {
-          switch (event) {
-            case StateChangedEvent(:final state):
-              _currentTunnelState = state;
-              _tunnelStateController.add(state);
-              break;
-            case ErrorEvent(:final message):
-              _tunnelErrorController.add(message);
-              break;
-            case LogEvent(:final message):
-              _tunnelLogController.add(message);
-              break;
-          }
-        });
+    _tunnelEventSubscription =
+        CloudflaredTunnelPlatform.instance.tunnelEventStream.listen((event) {
+      switch (event) {
+        case StateChangedEvent(:final state):
+          _currentTunnelState = state;
+          _tunnelStateController.add(state);
+          break;
+        case ErrorEvent(:final message):
+          _tunnelErrorController.add(message);
+          break;
+        case LogEvent(:final message):
+          _tunnelLogController.add(message);
+          break;
+      }
+    });
 
-    _serverEventSubscription = CloudflaredTunnelPlatform
-        .instance
-        .serverEventStream
-        .listen((event) {
-          switch (event) {
-            case ServerStateChangedEvent(:final state):
-              _currentServerState = state;
-              _serverStateController.add(state);
-              break;
-            case ServerErrorEvent(:final message):
-              _serverErrorController.add(message);
-              break;
-            case RequestLogEvent(:final log):
-              _requestLogController.add(log);
-              break;
-          }
-        });
+    _serverEventSubscription =
+        CloudflaredTunnelPlatform.instance.serverEventStream.listen((event) {
+      switch (event) {
+        case ServerStateChangedEvent(:final state):
+          _currentServerState = state;
+          _serverStateController.add(state);
+          break;
+        case ServerErrorEvent(:final message):
+          _serverErrorController.add(message);
+          break;
+        case RequestLogEvent(:final log):
+          _requestLogController.add(log);
+          break;
+      }
+    });
   }
 
   // ===========================================================================
