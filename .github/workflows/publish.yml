@@ -102,6 +102,25 @@ jobs:
             $content = $content -replace 'version: .+', "version: $version"
             Set-Content $file $content -NoNewline
           }
+
+          $changelogs = @(
+            'packages/cloudflared_tunnel_android_arm/CHANGELOG.md',
+            'packages/cloudflared_tunnel_android_x86/CHANGELOG.md',
+            'packages/cloudflared_tunnel_full/CHANGELOG.md'
+          )
+          foreach ($file in $changelogs) {
+            $content = Get-Content $file -Raw
+            if ($content -notmatch "(?m)^##\s+$([regex]::Escape($version))\b") {
+              $entry = "## $version`n`n- Maintenance release for the synchronized package set.`n`n"
+              if ($content -match "(?m)^#\s+Changelog\s*$") {
+                $content = $content -replace "(?m)(^#\s+Changelog\s*\r?\n\r?\n?)", "`$1$entry"
+              } else {
+                $content = "# Changelog`n`n$entry$content"
+              }
+              Set-Content $file $content -NoNewline
+            }
+          }
+
           $full = 'packages/cloudflared_tunnel_full/pubspec.yaml'
           $content = Get-Content $full -Raw
           $content = $content -replace 'cloudflared_tunnel_android_arm: \^.+', "cloudflared_tunnel_android_arm: ^$version"
