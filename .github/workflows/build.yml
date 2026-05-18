@@ -1,0 +1,99 @@
+name: Build
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: mobile/go.mod
+          cache-dependency-path: mobile/go.sum
+
+      - name: Install gomobile
+        run: |
+          go install golang.org/x/mobile/cmd/gomobile@latest
+          go install golang.org/x/mobile/cmd/gobind@latest
+          gomobile init
+
+      - name: Build Android libraries
+        run: |
+          cd mobile
+          ./build.sh android
+
+      - name: Verify ABI split
+        run: bash tool/verify_android_abis.sh packages
+
+      - name: Use local package dependencies
+        shell: pwsh
+        run: ./tool/use_local_packages.ps1
+
+      - name: Get dependencies
+        run: |
+          flutter pub get --directory packages/cloudflared_tunnel_android_arm
+          flutter pub get --directory packages/cloudflared_tunnel_android_x86
+          flutter pub get --directory packages/cloudflared_tunnel_full
+          flutter pub get --directory packages/cloudflared_tunnel_full/example
+
+      - name: Analyze
+        run: |
+          flutter analyze packages/cloudflared_tunnel_android_arm
+          flutter analyze packages/cloudflared_tunnel_android_x86
+          flutter analyze packages/cloudflared_tunnel_full
+          flutter analyze packages/cloudflared_tunnel_full/example
+
+      - name: Test
+        run: flutter test packages/cloudflared_tunnel_full
+
+      - name: Build Android example
+        run: |
+          cd packages/cloudflared_tunnel_full/example
+          flutter build apk --debug
+
+      - name: Restore publish pubspecs
+        shell: pwsh
+        run: ./tool/restore_pubspecs.ps1
+
+      - name: Check package sizes
+        run: |
+          bash tool/check_package_sizes.sh \
+            packages/cloudflared_tunnel_android_arm \
+            packages/cloudflared_tunnel_android_x86 \
+            packages/cloudflared_tunnel_full
+
+      - name: Publish dry-run sidecar packages
+        run: |
+          dart pub publish --dry-run --directory packages/cloudflared_tunnel_android_arm
+          dart pub publish --dry-run --directory packages/cloudflared_tunnel_android_x86
+
+      - name: Explain full package dry-run timing
+        run: |
+          echo "cloudflared_tunnel_full depends on sidecar package version 1.0.0."
+          echo "Its pub publish dry-run is performed in publish.yml after sidecar versions are visible on pub.dev."
+
+      - name: Upload Android package artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: split-packages
+          path: |
+            packages/cloudflared_tunnel_android_arm
+            packages/cloudflared_tunnel_android_x86
+            packages/cloudflared_tunnel_full
