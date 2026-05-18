@@ -54,14 +54,13 @@ jobs:
         run: |
           version="${{ steps.version.outputs.version }}"
           missing=0
-          for package in \
-            cloudflared_tunnel_android_arm \
-            cloudflared_tunnel_android_x86 \
-            cloudflared_tunnel_full; do
+          for package in cloudflared_tunnel_android_arm cloudflared_tunnel_android_x86 cloudflared_tunnel_full; do
             if curl -fsSL "https://pub.dev/api/packages/$package" | grep -q "\"version\":\"$version\""; then
               echo "$package $version is already published"
+              echo "$package=true" >> "$GITHUB_OUTPUT"
             else
               echo "$package $version is not published yet"
+              echo "$package=false" >> "$GITHUB_OUTPUT"
               missing=1
             fi
           done
@@ -203,17 +202,17 @@ jobs:
         run: echo "Version ${{ steps.version.outputs.version }} is already published for all packages."
 
       - name: Publish Android ARM package
-        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.dry_run) && steps.published.outputs.all != 'true' }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.dry_run) && steps.published.outputs.cloudflared_tunnel_android_arm != 'true' }}
         timeout-minutes: 15
         run: dart pub publish --force --directory "$RUNNER_TEMP/pub-packages/cloudflared_tunnel_android_arm"
 
       - name: Publish Android x86 package
-        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.dry_run) && steps.published.outputs.all != 'true' }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.dry_run) && steps.published.outputs.cloudflared_tunnel_android_x86 != 'true' }}
         timeout-minutes: 15
         run: dart pub publish --force --directory "$RUNNER_TEMP/pub-packages/cloudflared_tunnel_android_x86"
 
       - name: Wait for sidecar packages
-        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.dry_run) && steps.published.outputs.all != 'true' }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.dry_run) && steps.published.outputs.cloudflared_tunnel_full != 'true' }}
         shell: bash
         run: |
           version="${{ steps.version.outputs.version }}"
@@ -232,11 +231,18 @@ jobs:
             done
           done
 
+      - name: Refresh pub resolver metadata
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.dry_run) && steps.published.outputs.cloudflared_tunnel_full != 'true' }}
+        run: |
+          rm -f "$PUB_CACHE/hosted/pub.dev/.cache/cloudflared_tunnel_android_arm-versions.json"
+          rm -f "$PUB_CACHE/hosted/pub.dev/.cache/cloudflared_tunnel_android_x86-versions.json"
+          rm -f "$PUB_CACHE/hosted/pub.dev/.cache/cloudflared_tunnel_full-versions.json"
+
       - name: Publish dry-run full package
-        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.dry_run) && steps.published.outputs.all != 'true' }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.dry_run) && steps.published.outputs.cloudflared_tunnel_full != 'true' }}
         run: dart pub publish --dry-run --directory "$RUNNER_TEMP/pub-packages/cloudflared_tunnel_full"
 
       - name: Publish full package
-        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.dry_run) && steps.published.outputs.all != 'true' }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.dry_run) && steps.published.outputs.cloudflared_tunnel_full != 'true' }}
         timeout-minutes: 15
         run: dart pub publish --force --directory "$RUNNER_TEMP/pub-packages/cloudflared_tunnel_full"
