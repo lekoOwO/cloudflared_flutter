@@ -64,7 +64,7 @@ build_android() {
 
     # Build AAR with gomobile
     gomobile bind -v \
-        -target=android \
+        -target=android/arm,android/arm64,android/386,android/amd64 \
         -androidapi=21 \
         -o "$BUILD_DIR/cloudflared.aar" \
         -ldflags="-s -w" \
@@ -73,8 +73,8 @@ build_android() {
     if [ -f "$BUILD_DIR/cloudflared.aar" ]; then
         echo -e "${GREEN}✓ Android AAR built successfully: $BUILD_DIR/cloudflared.aar${NC}"
 
-        # Extract AAR for Flutter plugin
-        extract_aar_for_flutter
+        # Extract AAR for split Flutter packages
+        "$PROJECT_ROOT/tool/split_android_aar.sh" "$BUILD_DIR/cloudflared.aar"
     else
         echo -e "${RED}✗ Failed to build Android AAR${NC}"
         exit 1
