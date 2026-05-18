@@ -105,6 +105,26 @@ jobs:
           flutter test packages/cloudflared_tunnel_full
           ./tool/restore_pubspecs.ps1
 
+
+      - name: Restamp package versions for publishing
+        shell: pwsh
+        run: |
+          $version = '${{ steps.version.outputs.version }}'
+          $pubspecs = @(
+            'packages/cloudflared_tunnel_android_arm/pubspec.yaml',
+            'packages/cloudflared_tunnel_android_x86/pubspec.yaml',
+            'packages/cloudflared_tunnel_full/pubspec.yaml'
+          )
+          foreach ($file in $pubspecs) {
+            $content = Get-Content $file -Raw
+            $content = $content -replace 'version: .+', "version: $version"
+            Set-Content $file $content -NoNewline
+          }
+          $full = 'packages/cloudflared_tunnel_full/pubspec.yaml'
+          $content = Get-Content $full -Raw
+          $content = $content -replace 'cloudflared_tunnel_android_arm: \^.+', "cloudflared_tunnel_android_arm: ^$version"
+          $content = $content -replace 'cloudflared_tunnel_android_x86: \^.+', "cloudflared_tunnel_android_x86: ^$version"
+          Set-Content $full $content -NoNewline
       - name: Check package sizes
         run: |
           bash tool/check_package_sizes.sh \
