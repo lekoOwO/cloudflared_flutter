@@ -34,14 +34,14 @@ packages:
     source: hosted
     version: "1.1.2"
   cloudflared_tunnel_android_arm:
-    dependency: transitive
+    dependency: "direct overridden"
     description:
       path: "../../cloudflared_tunnel_android_arm"
       relative: true
     source: path
     version: "1.0.0"
   cloudflared_tunnel_android_x86:
-    dependency: transitive
+    dependency: "direct overridden"
     description:
       path: "../../cloudflared_tunnel_android_x86"
       relative: true
