@@ -90,8 +90,3 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
-dependency_overrides:
-  cloudflared_tunnel_android_arm:
-    path: ../../cloudflared_tunnel_android_arm
-  cloudflared_tunnel_android_x86:
-    path: ../../cloudflared_tunnel_android_x86
