@@ -8,6 +8,10 @@ fi
 
 gzip_limit=$((100 * 1024 * 1024))
 unpacked_limit=$((256 * 1024 * 1024))
+find_bin="${FIND_BIN:-find}"
+if [[ -x /usr/bin/find ]]; then
+  find_bin="/usr/bin/find"
+fi
 
 for package_dir in "$@"; do
   if [[ ! -f "$package_dir/pubspec.yaml" ]]; then
@@ -29,7 +33,7 @@ for package_dir in "$@"; do
     -C "$(dirname "$package_dir")" "$(basename "$package_dir")"
 
   gzip_size=$(wc -c < "$tmp_file")
-  unpacked_size=$(find "$package_dir" \
+  unpacked_size=$("$find_bin" "$package_dir" \
     -path '*/.dart_tool' -prune -o \
     -path '*/build' -prune -o \
     -type f -printf '%s\n' | awk '{ total += $1 } END { print total + 0 }')
