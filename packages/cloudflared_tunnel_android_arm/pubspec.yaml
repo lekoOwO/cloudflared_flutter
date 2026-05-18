@@ -1,0 +1,26 @@
+name: cloudflared_tunnel_android_arm
+description: Android ARM implementation package for cloudflared_tunnel_full with arm64-v8a and armeabi-v7a native libraries.
+version: 1.0.0
+homepage: https://github.com/lekoOwO/cloudflared_flutter
+repository: https://github.com/lekoOwO/cloudflared_flutter
+issue_tracker: https://github.com/lekoOwO/cloudflared_flutter/issues
+documentation: https://github.com/lekoOwO/cloudflared_flutter/tree/main/packages/cloudflared_tunnel_android_arm#readme
+
+environment:
+  sdk: ^3.0.0
+  flutter: ">=3.3.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_lints: ^5.0.0
+
+flutter:
+  plugin:
+    implements: cloudflared_tunnel_full
+    platforms:
+      android:
+        package: com.cloudflare.cloudflared_tunnel
+        pluginClass: CloudflaredTunnelPlugin
