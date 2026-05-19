@@ -51,6 +51,7 @@ class CloudflaredTunnelPlugin : FlutterPlugin, MethodCallHandler, EventChannel.S
     private var cloudflaredService: CloudflaredService? = null
     private var serviceBound = false
     private var pendingPermissionResult: Result? = null
+    private val serviceBindingScheduler by lazy { HandlerRetryScheduler(mainHandler) }
 
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
@@ -153,6 +154,31 @@ class CloudflaredTunnelPlugin : FlutterPlugin, MethodCallHandler, EventChannel.S
         return true
     }
 
+    private fun waitForBoundService(
+        result: Result,
+        errorEventType: String,
+        onReady: (CloudflaredService) -> Unit
+    ) {
+        ServiceBindingWaiter(
+            isReady = { serviceBound && cloudflaredService != null },
+            scheduler = serviceBindingScheduler,
+        ).wait(
+            onReady = {
+                val service = cloudflaredService
+                if (service != null) {
+                    onReady(service)
+                } else {
+                    sendEvent(errorEventType, mapOf("code" to 1, "message" to "Service not ready"))
+                    result.error("SERVICE_NOT_READY", "Service not ready", null)
+                }
+            },
+            onTimeout = {
+                sendEvent(errorEventType, mapOf("code" to 1, "message" to "Service not ready"))
+                result.error("SERVICE_NOT_READY", "Service not ready", null)
+            },
+        )
+    }
+
     private fun bindToServiceIfRunning() {
         val context = applicationContext ?: return
 
@@ -191,9 +217,17 @@ class CloudflaredTunnelPlugin : FlutterPlugin, MethodCallHandler, EventChannel.S
     private fun handleStart(call: MethodCall, result: Result) {
         val token = call.argument<String>("token")
         val originUrl = call.argument<String>("originUrl") ?: ""
+        val haConnections = call.argument<Int>("haConnections") ?: 4
+        val enablePostQuantum = call.argument<Boolean>("enablePostQuantum") ?: false
+        val quickTunnelUrl = call.argument<String>("quickTunnelUrl") ?: ""
 
         if (token.isNullOrEmpty()) {
             result.error("INVALID_TOKEN", "Token is required", null)
+            return
+        }
+
+        if (originUrl.isEmpty()) {
+            result.error("INVALID_ORIGIN_URL", "originUrl is required", null)
             return
         }
 
@@ -208,18 +242,23 @@ class CloudflaredTunnelPlugin : FlutterPlugin, MethodCallHandler, EventChannel.S
             return
         }
 
-        // Wait for service to bind, then start tunnel
-        mainHandler.postDelayed({
-            cloudflaredService?.startTunnel(token, originUrl) { success, error ->
-                if (!success && error != null) {
-                    // Error already sent via callback
+        // Wait for service to bind, then start tunnel. Binding can race with
+        // startForegroundService on Android, especially on TV devices.
+        waitForBoundService(result, "error") { service ->
+            service.startTunnel(
+                token = token,
+                originUrl = originUrl,
+                quickTunnelUrl = quickTunnelUrl,
+                haConnections = haConnections.toLong(),
+                enablePostQuantum = enablePostQuantum,
+            ) { success, error ->
+                if (success) {
+                    result.success(null)
+                } else {
+                    result.error("START_ERROR", error ?: "Failed to start tunnel", null)
                 }
-            } ?: run {
-                sendEvent("error", mapOf("code" to 1, "message" to "Service not ready"))
             }
-        }, 100)
-
-        result.success(null)
+        }
     }
 
     private fun handleStop(result: Result) {
@@ -299,17 +338,15 @@ class CloudflaredTunnelPlugin : FlutterPlugin, MethodCallHandler, EventChannel.S
             return
         }
 
-        mainHandler.postDelayed({
-            cloudflaredService?.startServer(rootDir, port) { success, error ->
-                if (!success && error != null) {
-                    // Error sent via callback
+        waitForBoundService(result, "serverError") { service ->
+            service.startServer(rootDir, port) { success, error ->
+                if (success) {
+                    result.success(null)
+                } else {
+                    result.error("START_SERVER_ERROR", error ?: "Failed to start server", null)
                 }
-            } ?: run {
-                sendEvent("serverError", mapOf("code" to 1, "message" to "Service not ready"))
             }
-        }, 100)
-
-        result.success(null)
+        }
     }
 
     private fun handleStopServer(result: Result) {

@@ -133,6 +133,8 @@ The plugin runs as a foreground service on Android, which means:
 await plugin.startTunnel(
   token: 'your-token',           // Required: Cloudflare tunnel token
   originUrl: 'http://127.0.0.1:8080',  // Local server to proxy to
+  quickTunnelUrl: 'random.trycloudflare.com', // Quick Tunnel hostname, if any
+  haConnections: 1,              // Recommended for Quick Tunnel
 );
 
 // Stop tunnel

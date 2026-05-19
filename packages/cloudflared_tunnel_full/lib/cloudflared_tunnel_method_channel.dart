@@ -26,15 +26,17 @@ class MethodChannelCloudflaredTunnel extends CloudflaredTunnelPlatform {
   @override
   Future<void> start({
     required String token,
-    String originUrl = '',
+    required String originUrl,
     int haConnections = 4,
     bool enablePostQuantum = false,
+    String quickTunnelUrl = '',
   }) async {
     await _methodChannel.invokeMethod('start', {
       'token': token,
       'originUrl': originUrl,
       'haConnections': haConnections,
       'enablePostQuantum': enablePostQuantum,
+      'quickTunnelUrl': quickTunnelUrl,
     });
   }
 

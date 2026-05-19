@@ -29,3 +29,17 @@ import 'package:cloudflared_tunnel_full/cloudflared_tunnel.dart';
 ```
 
 The public Dart API exposes `CloudflaredTunnel`.
+
+## Quick Tunnel local origin
+
+```dart
+await CloudflaredTunnel().startTunnel(
+  token: quickTunnelToken,
+  originUrl: 'http://127.0.0.1:8080',
+  quickTunnelUrl: 'random.trycloudflare.com',
+  haConnections: 1,
+);
+```
+
+`originUrl` is used to create the local ingress rule that proxies public
+trycloudflare requests back to your app's local HTTP server.

@@ -178,6 +178,8 @@ class CloudflaredTunnel {
   /// [token] - The tunnel token from Cloudflare dashboard (required)
   /// [originUrl] - The local URL to proxy traffic to (e.g., 'http://127.0.0.1:3000')
   ///               This should point to your running HTTP server.
+  /// [quickTunnelUrl] - The trycloudflare hostname for Quick Tunnel mode
+  ///                    (e.g., 'random.trycloudflare.com').
   /// [haConnections] - Number of high availability connections (default: 4)
   /// [enablePostQuantum] - Enable post-quantum cryptography (default: false)
   ///
@@ -194,15 +196,17 @@ class CloudflaredTunnel {
   /// ```
   Future<void> startTunnel({
     required String token,
-    String originUrl = '',
+    required String originUrl,
     int haConnections = 4,
     bool enablePostQuantum = false,
+    String quickTunnelUrl = '',
   }) async {
     await CloudflaredTunnelPlatform.instance.start(
       token: token,
       originUrl: originUrl,
       haConnections: haConnections,
       enablePostQuantum: enablePostQuantum,
+      quickTunnelUrl: quickTunnelUrl,
     );
   }
 
@@ -309,6 +313,7 @@ class CloudflaredTunnel {
     int port = 8080,
     int haConnections = 4,
     bool enablePostQuantum = false,
+    String quickTunnelUrl = '',
   }) async {
     // Start server first
     await startServer(rootDir: rootDir, port: port);
@@ -322,6 +327,7 @@ class CloudflaredTunnel {
       originUrl: 'http://127.0.0.1:$port',
       haConnections: haConnections,
       enablePostQuantum: enablePostQuantum,
+      quickTunnelUrl: quickTunnelUrl,
     );
   }
 

@@ -59,6 +59,18 @@ class CloudflaredService : Service() {
             private set
 
         @Volatile
+        var lastQuickTunnelUrl: String? = null
+            private set
+
+        @Volatile
+        var lastHaConnections: Long = 4
+            private set
+
+        @Volatile
+        var lastEnablePostQuantum: Boolean = false
+            private set
+
+        @Volatile
         var lastServerRootDir: String? = null
             private set
 
@@ -225,7 +237,14 @@ class CloudflaredService : Service() {
     // Tunnel Methods
     // ========================================================================
 
-    fun startTunnel(token: String, originUrl: String, callback: ((Boolean, String?) -> Unit)? = null) {
+    fun startTunnel(
+        token: String,
+        originUrl: String,
+        quickTunnelUrl: String = "",
+        haConnections: Long = 4,
+        enablePostQuantum: Boolean = false,
+        callback: ((Boolean, String?) -> Unit)? = null
+    ) {
         if (isTunnelRunning) {
             callback?.invoke(false, "Tunnel is already running")
             return
@@ -234,8 +253,13 @@ class CloudflaredService : Service() {
         // Force cleanup any previous tunnel state before starting
         forceCleanupTunnel()
 
+        val effectiveHaConnections = if (quickTunnelUrl.isNotEmpty()) 1L else haConnections
+
         lastTunnelToken = token
         lastOriginUrl = originUrl
+        lastQuickTunnelUrl = quickTunnelUrl
+        lastHaConnections = effectiveHaConnections
+        lastEnablePostQuantum = enablePostQuantum
 
         executor.execute {
             try {
@@ -275,7 +299,14 @@ class CloudflaredService : Service() {
                 }
 
                 // This blocks until tunnel stops
-                Mobile.startTunnelWithCallback(token, originUrl, goCallback)
+                MobileTunnelBinding.startTunnelWithOptions(
+                    token,
+                    originUrl,
+                    quickTunnelUrl,
+                    effectiveHaConnections,
+                    enablePostQuantum,
+                    goCallback
+                )
 
             } catch (e: Exception) {
                 val errorMessage = e.message ?: "Unknown error"
@@ -315,6 +346,9 @@ class CloudflaredService : Service() {
             currentTunnelState = 0
             lastTunnelToken = null
             lastOriginUrl = null
+            lastQuickTunnelUrl = null
+            lastHaConnections = 4
+            lastEnablePostQuantum = false
         }
 
         // Reset Prometheus metrics for clean restart
@@ -336,6 +370,9 @@ class CloudflaredService : Service() {
         currentTunnelState = 0
         lastTunnelToken = null
         lastOriginUrl = null
+        lastQuickTunnelUrl = null
+        lastHaConnections = 4
+        lastEnablePostQuantum = false
     }
 
     // ========================================================================

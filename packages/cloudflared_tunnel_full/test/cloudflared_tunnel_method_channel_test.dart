@@ -23,4 +23,31 @@ void main() {
   test('getVersion', () async {
     expect(await platform.getVersion(), '42');
   });
+
+  test('start passes full quick tunnel options through the method channel',
+      () async {
+    MethodCall? capturedCall;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+      capturedCall = methodCall;
+      return null;
+    });
+
+    await platform.start(
+      token: 'test-token',
+      originUrl: 'http://127.0.0.1:3579',
+      quickTunnelUrl: 'random.trycloudflare.com',
+      haConnections: 1,
+      enablePostQuantum: true,
+    );
+
+    expect(capturedCall?.method, 'start');
+    expect(capturedCall?.arguments, <String, Object>{
+      'token': 'test-token',
+      'originUrl': 'http://127.0.0.1:3579',
+      'haConnections': 1,
+      'enablePostQuantum': true,
+      'quickTunnelUrl': 'random.trycloudflare.com',
+    });
+  });
 }

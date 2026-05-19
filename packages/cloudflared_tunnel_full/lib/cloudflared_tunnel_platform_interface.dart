@@ -190,9 +190,10 @@ abstract class CloudflaredTunnelPlatform extends PlatformInterface {
   /// Start the tunnel with the given token and origin URL
   Future<void> start({
     required String token,
-    String originUrl = '',
+    required String originUrl,
     int haConnections = 4,
     bool enablePostQuantum = false,
+    String quickTunnelUrl = '',
   }) {
     throw UnimplementedError('start() has not been implemented.');
   }

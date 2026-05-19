@@ -190,9 +190,10 @@ abstract class CloudflaredTunnelPlatform extends PlatformInterface {
   /// Start the tunnel with the given token and origin URL
   Future<void> start({
     required String token,
-    String originUrl = '',
+    required String originUrl,
     int haConnections = 4,
     bool enablePostQuantum = false,
+    String quickTunnelUrl = '',
   }) {
     throw UnimplementedError('start() has not been implemented.');
   }
@@ -295,11 +296,13 @@ abstract class CloudflaredTunnelPlatform extends PlatformInterface {
 
   /// Request notification permission (Android 13+)
   Future<bool> requestNotificationPermission() {
-    throw UnimplementedError('requestNotificationPermission() has not been implemented.');
+    throw UnimplementedError(
+        'requestNotificationPermission() has not been implemented.');
   }
 
   /// Check if notification permission is granted
   Future<bool> hasNotificationPermission() {
-    throw UnimplementedError('hasNotificationPermission() has not been implemented.');
+    throw UnimplementedError(
+        'hasNotificationPermission() has not been implemented.');
   }
 }

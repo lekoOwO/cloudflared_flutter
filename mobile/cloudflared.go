@@ -13,6 +13,7 @@ import (
 	"net"
 	"net/netip"
 	"runtime/debug"
+	"strings"
 	"sync"
 	"time"
 
@@ -221,6 +222,8 @@ type TunnelConfig struct {
 	Token string
 	// OriginURL is the local URL to proxy traffic to (e.g., "http://localhost:8080")
 	OriginURL string
+	// QuickTunnelURL is the trycloudflare hostname assigned to a Quick Tunnel
+	QuickTunnelURL string
 	// HAConnections is the number of high availability connections (default: 4)
 	HAConnections int
 	// EnablePostQuantum enables post-quantum cryptography
@@ -282,17 +285,61 @@ func parseToken(tokenStr string) (*connection.TunnelToken, error) {
 	return &token, nil
 }
 
+func normalizeHAConnections(quickTunnelURL string, haConnections int) int {
+	if quickTunnelURL != "" {
+		return 1
+	}
+	if haConnections < 1 {
+		return 4
+	}
+	return haConnections
+}
+
+func normalizeQuickTunnelHostname(quickTunnelURL string) string {
+	quickTunnelURL = strings.TrimSpace(quickTunnelURL)
+	if quickTunnelURL == "" {
+		return ""
+	}
+	if strings.HasPrefix(quickTunnelURL, "https://") || strings.HasPrefix(quickTunnelURL, "http://") {
+		withoutScheme := strings.TrimPrefix(strings.TrimPrefix(quickTunnelURL, "https://"), "http://")
+		if slash := strings.Index(withoutScheme, "/"); slash >= 0 {
+			return withoutScheme[:slash]
+		}
+		return withoutScheme
+	}
+	if slash := strings.Index(quickTunnelURL, "/"); slash >= 0 {
+		return quickTunnelURL[:slash]
+	}
+	return quickTunnelURL
+}
+
 // NewTunnel creates a new Tunnel instance with the given configuration.
 // Call Start() to begin the tunnel connection.
 func NewTunnel(token string, originURL string, callback TunnelCallback) (*Tunnel, error) {
+	return NewTunnelWithOptions(token, originURL, "", 4, false, callback)
+}
+
+// NewTunnelWithOptions creates a new Tunnel instance with the full mobile
+// configuration used by the gomobile binding.
+func NewTunnelWithOptions(
+	token string,
+	originURL string,
+	quickTunnelURL string,
+	haConnections int,
+	enablePostQuantum bool,
+	callback TunnelCallback,
+) (*Tunnel, error) {
 	if token == "" {
 		return nil, errors.New("token is required")
 	}
+	quickTunnelURL = normalizeQuickTunnelHostname(quickTunnelURL)
 
 	config := &TunnelConfig{
-		Token:         token,
-		OriginURL:     originURL,
-		HAConnections: 4,
+		Token:             token,
+		OriginURL:         originURL,
+		QuickTunnelURL:    quickTunnelURL,
+		HAConnections:     normalizeHAConnections(quickTunnelURL, haConnections),
+		EnablePostQuantum: enablePostQuantum,
 	}
 
 	// Create logger that sends to callback
@@ -302,6 +349,11 @@ func NewTunnel(token string, originURL string, callback TunnelCallback) (*Tunnel
 	logToCallback(callback, 0, "[NewTunnel] Creating tunnel instance")
 	logToCallback(callback, 0, "[NewTunnel] Token length: %d", len(token))
 	logToCallback(callback, 0, "[NewTunnel] OriginURL: %s", originURL)
+	if quickTunnelURL != "" {
+		logToCallback(callback, 0, "[NewTunnel] QuickTunnelURL: %s", quickTunnelURL)
+	}
+	logToCallback(callback, 0, "[NewTunnel] HA connections: %d", config.HAConnections)
+	logToCallback(callback, 0, "[NewTunnel] EnablePostQuantum: %t", enablePostQuantum)
 
 	t := &Tunnel{
 		config:         config,
@@ -312,6 +364,37 @@ func NewTunnel(token string, originURL string, callback TunnelCallback) (*Tunnel
 	}
 
 	return t, nil
+}
+
+func newTunnelProperties(credentials connection.Credentials, quickTunnelURL string) *connection.TunnelProperties {
+	return &connection.TunnelProperties{
+		Credentials:    credentials,
+		QuickTunnelUrl: quickTunnelURL,
+	}
+}
+
+func buildLocalIngress(originURL string) (ingress.Ingress, error) {
+	if originURL == "" {
+		return ingress.Ingress{}, errors.New("originURL is required to create local ingress")
+	}
+
+	return ingress.ParseIngress(&config.Configuration{
+		Ingress: []config.UnvalidatedIngressRule{
+			{
+				Service: originURL,
+			},
+		},
+	})
+}
+
+func formatQuickTunnelURL(quickTunnelURL string) string {
+	if quickTunnelURL == "" {
+		return ""
+	}
+	if strings.HasPrefix(quickTunnelURL, "https://") || strings.HasPrefix(quickTunnelURL, "http://") {
+		return quickTunnelURL
+	}
+	return "https://" + quickTunnelURL
 }
 
 // Start begins the tunnel connection.
@@ -364,10 +447,11 @@ func (t *Tunnel) Start() (err error) {
 	t.logCallback(0, "[Start] Got credentials, AccountTag: %s", credentials.AccountTag)
 
 	// Create tunnel properties
-	namedTunnel := &connection.TunnelProperties{
-		Credentials: credentials,
-	}
+	namedTunnel := newTunnelProperties(credentials, t.config.QuickTunnelURL)
 	t.logCallback(0, "[Start] Created tunnel properties")
+	if t.config.QuickTunnelURL != "" {
+		t.logCallback(0, "[Start] Quick tunnel URL registered %s", formatQuickTunnelURL(t.config.QuickTunnelURL))
+	}
 
 	// Run the tunnel
 	t.logCallback(0, "[Start] Calling runTunnel...")
@@ -508,12 +592,23 @@ func (t *Tunnel) runTunnel(namedTunnel *connection.TunnelProperties) error {
 	}
 	t.logCallback(0, "[runTunnel] TLS configs created, count: %d", len(edgeTLSConfigs))
 
-	// Create ingress rules
-	// For remotely-managed tunnels (token-based), the ingress configuration
-	// is fetched from the Cloudflare dashboard. We start with an empty ingress
-	// and let the orchestrator update it from remote config.
-	ingressRules := ingress.Ingress{}
-	t.logCallback(0, "[runTunnel] Empty ingress rules created (will be fetched from dashboard)")
+	// Create ingress rules. Quick Tunnels and mobile local-origin use cases need
+	// a local ingress rule so eyeball traffic is proxied to the app's local HTTP
+	// server instead of waiting for a remote dashboard config.
+	var ingressRules ingress.Ingress
+	if t.config.OriginURL != "" {
+		t.logCallback(0, "Creating local ingress for originURL: %s", t.config.OriginURL)
+		ingressRules, err = buildLocalIngress(t.config.OriginURL)
+		if err != nil {
+			t.logCallback(2, "[runTunnel] ERROR creating local ingress: %v", err)
+			return fmt.Errorf("failed to create local ingress: %w", err)
+		}
+	} else {
+		// For remotely-managed named tunnels with no local origin override, the
+		// ingress configuration can still be fetched from the Cloudflare dashboard.
+		ingressRules = ingress.Ingress{}
+		t.logCallback(0, "[runTunnel] Empty ingress rules created (will be fetched from dashboard)")
+	}
 
 	t.logCallback(0, "[runTunnel] Creating origin services...")
 	t.notifyState(StateConnecting, "Creating origin services...")
@@ -574,6 +669,14 @@ func (t *Tunnel) runTunnel(namedTunnel *connection.TunnelProperties) error {
 		return errors.New("observer is nil")
 	}
 	t.logCallback(0, "[runTunnel] Observer created OK")
+	observer.RegisterSink(connection.EventSinkFunc(func(event connection.Event) {
+		if event.EventType == connection.SetURL {
+			t.logCallback(0, "Quick tunnel URL registered %s", formatQuickTunnelURL(event.URL))
+		}
+	}))
+	if namedTunnel.QuickTunnelUrl != "" {
+		observer.SendURL(namedTunnel.QuickTunnelUrl)
+	}
 
 	// HA connections
 	haConnections := t.config.HAConnections
@@ -761,6 +864,19 @@ func StartTunnel(token string, originURL string) error {
 // StartTunnelWithCallback starts a tunnel with a callback for state updates.
 // This blocks until the tunnel is stopped or encounters an error.
 func StartTunnelWithCallback(token string, originURL string, callback TunnelCallback) (err error) {
+	return StartTunnelWithOptions(token, originURL, "", 4, false, callback)
+}
+
+// StartTunnelWithOptions starts a tunnel with all mobile options.
+// This blocks until the tunnel is stopped or encounters an error.
+func StartTunnelWithOptions(
+	token string,
+	originURL string,
+	quickTunnelURL string,
+	haConnections int64,
+	enablePostQuantum bool,
+	callback TunnelCallback,
+) (err error) {
 	// Recover from any panics in the Go code, including duplicate metrics registration
 	defer func() {
 		if r := recover(); r != nil {
@@ -791,7 +907,14 @@ func StartTunnelWithCallback(token string, originURL string, callback TunnelCall
 	tunnelMu.Unlock()
 
 	tunnelMu.Lock()
-	tunnel, err := NewTunnel(token, originURL, callback)
+	tunnel, err := NewTunnelWithOptions(
+		token,
+		originURL,
+		quickTunnelURL,
+		int(haConnections),
+		enablePostQuantum,
+		callback,
+	)
 	if err != nil {
 		tunnelMu.Unlock()
 		return err

@@ -24,15 +24,17 @@ class MethodChannelCloudflaredTunnel extends CloudflaredTunnelPlatform {
   @override
   Future<void> start({
     required String token,
-    String originUrl = '',
+    required String originUrl,
     int haConnections = 4,
     bool enablePostQuantum = false,
+    String quickTunnelUrl = '',
   }) async {
     await _methodChannel.invokeMethod('start', {
       'token': token,
       'originUrl': originUrl,
       'haConnections': haConnections,
       'enablePostQuantum': enablePostQuantum,
+      'quickTunnelUrl': quickTunnelUrl,
     });
   }
 
@@ -97,8 +99,7 @@ class MethodChannelCloudflaredTunnel extends CloudflaredTunnelPlatform {
 
   @override
   Future<ServerState> getServerState() async {
-    final stateValue =
-        await _methodChannel.invokeMethod<int>('getServerState');
+    final stateValue = await _methodChannel.invokeMethod<int>('getServerState');
     return ServerState.fromValue(stateValue ?? 0);
   }
 
@@ -258,13 +259,15 @@ class MethodChannelCloudflaredTunnel extends CloudflaredTunnelPlatform {
 
   @override
   Future<bool> requestNotificationPermission() async {
-    final granted = await _methodChannel.invokeMethod<bool>('requestNotificationPermission');
+    final granted = await _methodChannel
+        .invokeMethod<bool>('requestNotificationPermission');
     return granted ?? false;
   }
 
   @override
   Future<bool> hasNotificationPermission() async {
-    final hasPermission = await _methodChannel.invokeMethod<bool>('hasNotificationPermission');
+    final hasPermission =
+        await _methodChannel.invokeMethod<bool>('hasNotificationPermission');
     return hasPermission ?? false;
   }
 }
